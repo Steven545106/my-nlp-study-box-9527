@@ -18,6 +18,7 @@
             --primary-blue: #5865f2;
             --nav-bg: #18191c;
             --danger-color: #ed4245;
+            --star-color: #ffd700;
         }
 
         body {
@@ -61,6 +62,21 @@
             background-color: var(--primary-blue);
             color: white;
             border-color: rgba(255,255,255,0.2);
+        }
+
+        .btn-star-bank {
+            color: var(--star-color);
+            border-color: rgba(255, 215, 0, 0.3);
+        }
+        
+        .btn-star-bank:hover {
+            background-color: rgba(255, 215, 0, 0.1);
+        }
+
+        .btn-star-bank.active {
+            background-color: #d4b200;
+            color: white;
+            border-color: transparent;
         }
 
         .reset-btn {
@@ -125,7 +141,7 @@
         }
 
         .star-btn.active {
-            color: #ffd700; 
+            color: var(--star-color); 
             text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
         }
 
@@ -140,6 +156,16 @@
             margin-bottom: 25px;
             min-height: 60px;
             white-space: pre-wrap;
+        }
+
+        .source-tag {
+            font-size: 0.9rem;
+            background-color: var(--primary-blue);
+            padding: 3px 8px;
+            border-radius: 4px;
+            margin-right: 8px;
+            font-weight: bold;
+            vertical-align: middle;
         }
 
         .options-list {
@@ -204,6 +230,7 @@
     <button id="btn-web" class="nav-btn active" onclick="switchBank('web', this)">網大題庫</button>
     <button id="btn-v1" class="nav-btn" onclick="switchBank('v1', this)">自然語言 V1</button>
     <button id="btn-v2" class="nav-btn" onclick="switchBank('v2', this)">自然語言 V2</button>
+    <button id="btn-starred" class="nav-btn btn-star-bank" onclick="startReviewMode(this)">⭐ 星星題庫</button>
     <button class="reset-btn" onclick="resetData()">清除紀錄</button>
 </div>
 
@@ -342,27 +369,41 @@
 ]
     };
 
+    const bankNames = {
+        web: "網大題庫",
+        v1: "自然語言 V1",
+        v2: "自然語言 V2"
+    };
+
     let currentBankKey = 'web';
     let currentIdx = 0;
+    
+    // 新增：星星題庫專用變數
+    let isReviewMode = false;
+    let reviewList = []; // 存放格式: [{ bankKey: 'web', qIdx: 0 }, ...]
 
-    // 從 localStorage 讀取紀錄，如果沒有就預設為空物件
     let userAnswers = JSON.parse(localStorage.getItem('nlp_quiz_answers')) || {}; 
     let starredQuestions = JSON.parse(localStorage.getItem('nlp_quiz_stars')) || {}; 
 
-    // 新增：把資料存進 localStorage 的函數
     function saveData() {
         localStorage.setItem('nlp_quiz_answers', JSON.stringify(userAnswers));
         localStorage.setItem('nlp_quiz_stars', JSON.stringify(starredQuestions));
     }
 
-    // 新增：清除所有紀錄的函數
     function resetData() {
         if (confirm("確定要清除所有作答紀錄和星星嗎？這無法復原喔！")) {
             localStorage.removeItem('nlp_quiz_answers');
             localStorage.removeItem('nlp_quiz_stars');
             userAnswers = {};
             starredQuestions = {};
+            isReviewMode = false;
+            currentBankKey = 'web';
             currentIdx = 0;
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('btn-web').classList.add('active');
+            document.getElementById('bank-name').innerText = "網大題庫";
+            
             loadQuestion();
             alert("紀錄已清除，可以重新開始測驗了！");
         }
@@ -372,6 +413,7 @@
         document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
         btnElement.classList.add('active');
 
+        isReviewMode = false;
         currentBankKey = key;
         currentIdx = 0;
         document.getElementById('bank-name').innerText = btnElement.innerText;
@@ -379,19 +421,60 @@
         loadQuestion();
     }
 
+    // 新增：啟動星星題庫複習模式
+    function startReviewMode(btnElement) {
+        reviewList = [];
+        
+        // 掃描所有題庫，把有打星號的題目加進清單
+        for (let bKey in allBanksData) {
+            if (starredQuestions[bKey]) {
+                for (let i = 0; i < allBanksData[bKey].length; i++) {
+                    if (starredQuestions[bKey][i]) {
+                        reviewList.push({ bankKey: bKey, qIdx: i });
+                    }
+                }
+            }
+        }
+
+        if (reviewList.length === 0) {
+            alert("目前還沒有標記任何星星題目喔！快去各個測驗中點擊星星標記吧！");
+            return;
+        }
+
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        btnElement.classList.add('active');
+
+        isReviewMode = true;
+        currentIdx = 0; // 在複習模式中，currentIdx 代表 reviewList 的順序
+        document.getElementById('bank-name').innerText = "⭐ 星星題庫複習";
+        
+        loadQuestion();
+    }
+
+    // 新增：取得當前實際題目的參照 (處理跨模式的問題)
+    function getActualReference() {
+        if (isReviewMode) {
+            return reviewList[currentIdx];
+        } else {
+            return { bankKey: currentBankKey, qIdx: currentIdx };
+        }
+    }
+
     function toggleStar() {
-        if (!starredQuestions[currentBankKey]) {
-            starredQuestions[currentBankKey] = {};
+        const ref = getActualReference();
+        if (!starredQuestions[ref.bankKey]) {
+            starredQuestions[ref.bankKey] = {};
         }
         
-        starredQuestions[currentBankKey][currentIdx] = !starredQuestions[currentBankKey][currentIdx];
+        starredQuestions[ref.bankKey][ref.qIdx] = !starredQuestions[ref.bankKey][ref.qIdx];
         updateStarUI();
-        saveData(); // 點擊星星後立刻存檔
+        saveData(); 
     }
 
     function updateStarUI() {
+        const ref = getActualReference();
         const starBtn = document.getElementById('star-btn');
-        if (starredQuestions[currentBankKey] && starredQuestions[currentBankKey][currentIdx]) {
+        if (starredQuestions[ref.bankKey] && starredQuestions[ref.bankKey][ref.qIdx]) {
             starBtn.classList.add('active');
         } else {
             starBtn.classList.remove('active');
@@ -399,20 +482,33 @@
     }
 
     function loadQuestion() {
-        const bank = allBanksData[currentBankKey];
-        if (!bank || bank.length === 0) return;
+        let q, totalLen;
+        let ref = getActualReference();
 
-        const q = bank[currentIdx];
-        document.getElementById('progress').innerText = `${currentIdx + 1} / ${bank.length}`;
-        document.getElementById('question-text').innerText = q.question;
+        // 避免複習模式清單為空時出錯
+        if (isReviewMode && reviewList.length === 0) return; 
+
+        q = allBanksData[ref.bankKey][ref.qIdx];
+        totalLen = isReviewMode ? reviewList.length : allBanksData[ref.bankKey].length;
+
+        document.getElementById('progress').innerText = `${currentIdx + 1} / ${totalLen}`;
+        
+        // 如果是星星題庫模式，在題目最前面加上來源標籤，方便知道這題來自哪裡
+        let questionTextHTML = "";
+        if (isReviewMode) {
+            questionTextHTML = `<span class="source-tag">${bankNames[ref.bankKey]}</span> `;
+        }
+        questionTextHTML += q.question;
+        
+        document.getElementById('question-text').innerHTML = questionTextHTML;
         
         updateStarUI();
         
         const container = document.getElementById('options-container');
         container.innerHTML = '';
 
-        const bankAnswers = userAnswers[currentBankKey] || {};
-        const savedAnswer = bankAnswers[currentIdx];
+        const bankAnswers = userAnswers[ref.bankKey] || {};
+        const savedAnswer = bankAnswers[ref.qIdx];
 
         Object.entries(q.options).forEach(([key, value]) => {
             const optionDiv = document.createElement('div');
@@ -438,21 +534,21 @@
 
         document.getElementById('prev-btn').disabled = currentIdx === 0;
         document.getElementById('next-btn').disabled = false;
-        document.getElementById('next-btn').innerText = (currentIdx === bank.length - 1) ? "完成測驗" : "下一題";
+        document.getElementById('next-btn').innerText = (currentIdx === totalLen - 1) ? "完成測驗" : "下一題";
     }
 
     function handleSelect(selectedKey) {
-        if (!userAnswers[currentBankKey]) userAnswers[currentBankKey] = {};
-        userAnswers[currentBankKey][currentIdx] = selectedKey;
-        saveData(); // 作答後立刻存檔
+        const ref = getActualReference();
+        if (!userAnswers[ref.bankKey]) userAnswers[ref.bankKey] = {};
+        userAnswers[ref.bankKey][ref.qIdx] = selectedKey;
+        saveData(); 
         loadQuestion();
     }
 
     function changeQuestion(step) {
-        const bank = allBanksData[currentBankKey];
-        if (!bank) return;
+        let totalLen = isReviewMode ? reviewList.length : allBanksData[currentBankKey].length;
 
-        if (currentIdx === bank.length - 1 && step === 1) {
+        if (currentIdx === totalLen - 1 && step === 1) {
             alert("您已完成本題庫測驗！");
             return;
         }
