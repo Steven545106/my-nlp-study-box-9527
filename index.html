@@ -17,6 +17,7 @@
             --wrong-bg: rgba(244, 67, 54, 0.1);
             --primary-blue: #5865f2;
             --nav-bg: #18191c;
+            --danger-color: #ed4245;
         }
 
         body {
@@ -41,7 +42,7 @@
             top: 0;
             z-index: 100;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
-            flex-wrap: wrap; /* 手機螢幕小可以自動換行 */
+            flex-wrap: wrap; 
         }
 
         .nav-btn {
@@ -60,6 +61,24 @@
             background-color: var(--primary-blue);
             color: white;
             border-color: rgba(255,255,255,0.2);
+        }
+
+        .reset-btn {
+            background-color: transparent;
+            color: var(--danger-color);
+            border: 1px solid var(--danger-color);
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            margin-left: 20px;
+        }
+
+        .reset-btn:hover {
+            background-color: var(--danger-color);
+            color: white;
         }
 
         .quiz-container {
@@ -81,10 +100,33 @@
             padding-bottom: 10px;
         }
 
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
         .quiz-title {
             font-size: 1.1rem;
             color: var(--primary-blue);
             font-weight: bold;
+        }
+
+        .star-btn {
+            font-size: 1.5rem;
+            color: #555; 
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+        }
+
+        .star-btn:hover {
+            transform: scale(1.2);
+        }
+
+        .star-btn.active {
+            color: #ffd700; 
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
         }
 
         .progress {
@@ -162,11 +204,15 @@
     <button id="btn-web" class="nav-btn active" onclick="switchBank('web', this)">網大題庫</button>
     <button id="btn-v1" class="nav-btn" onclick="switchBank('v1', this)">自然語言 V1</button>
     <button id="btn-v2" class="nav-btn" onclick="switchBank('v2', this)">自然語言 V2</button>
+    <button class="reset-btn" onclick="resetData()">清除紀錄</button>
 </div>
 
 <div class="quiz-container">
     <div class="quiz-header">
-        <div class="quiz-title" id="bank-name">網大題庫測驗</div>
+        <div class="header-left">
+            <div class="quiz-title" id="bank-name">網大題庫測驗</div>
+            <div class="star-btn" id="star-btn" onclick="toggleStar()" title="標記為不熟練的題目">★</div>
+        </div>
         <div class="progress" id="progress">0 / 0</div>
     </div>
     
@@ -180,7 +226,6 @@
 </div>
 
 <script>
-    // 直接內建所有題庫資料，完全不需要讀取外部檔案！
     const allBanksData = {
         web: [
   { "id": 1, "question": "以下何者是抓取討論版資料時要注意的事項？", "options": { "A": "確定合適的討論版", "B": "訂定適當的關鍵字", "C": "設定白名單", "D": "設定黑名單", "E": "以上皆是" }, "answer": "E" },
@@ -299,7 +344,29 @@
 
     let currentBankKey = 'web';
     let currentIdx = 0;
-    let userAnswers = {}; 
+
+    // 從 localStorage 讀取紀錄，如果沒有就預設為空物件
+    let userAnswers = JSON.parse(localStorage.getItem('nlp_quiz_answers')) || {}; 
+    let starredQuestions = JSON.parse(localStorage.getItem('nlp_quiz_stars')) || {}; 
+
+    // 新增：把資料存進 localStorage 的函數
+    function saveData() {
+        localStorage.setItem('nlp_quiz_answers', JSON.stringify(userAnswers));
+        localStorage.setItem('nlp_quiz_stars', JSON.stringify(starredQuestions));
+    }
+
+    // 新增：清除所有紀錄的函數
+    function resetData() {
+        if (confirm("確定要清除所有作答紀錄和星星嗎？這無法復原喔！")) {
+            localStorage.removeItem('nlp_quiz_answers');
+            localStorage.removeItem('nlp_quiz_stars');
+            userAnswers = {};
+            starredQuestions = {};
+            currentIdx = 0;
+            loadQuestion();
+            alert("紀錄已清除，可以重新開始測驗了！");
+        }
+    }
 
     function switchBank(key, btnElement) {
         document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -312,6 +379,25 @@
         loadQuestion();
     }
 
+    function toggleStar() {
+        if (!starredQuestions[currentBankKey]) {
+            starredQuestions[currentBankKey] = {};
+        }
+        
+        starredQuestions[currentBankKey][currentIdx] = !starredQuestions[currentBankKey][currentIdx];
+        updateStarUI();
+        saveData(); // 點擊星星後立刻存檔
+    }
+
+    function updateStarUI() {
+        const starBtn = document.getElementById('star-btn');
+        if (starredQuestions[currentBankKey] && starredQuestions[currentBankKey][currentIdx]) {
+            starBtn.classList.add('active');
+        } else {
+            starBtn.classList.remove('active');
+        }
+    }
+
     function loadQuestion() {
         const bank = allBanksData[currentBankKey];
         if (!bank || bank.length === 0) return;
@@ -319,6 +405,8 @@
         const q = bank[currentIdx];
         document.getElementById('progress').innerText = `${currentIdx + 1} / ${bank.length}`;
         document.getElementById('question-text').innerText = q.question;
+        
+        updateStarUI();
         
         const container = document.getElementById('options-container');
         container.innerHTML = '';
@@ -356,6 +444,7 @@
     function handleSelect(selectedKey) {
         if (!userAnswers[currentBankKey]) userAnswers[currentBankKey] = {};
         userAnswers[currentBankKey][currentIdx] = selectedKey;
+        saveData(); // 作答後立刻存檔
         loadQuestion();
     }
 
