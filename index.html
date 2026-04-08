@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NLP 題庫測驗系統 - 完美單機版</title>
+    <style>
+        :root {
+            --bg-color: #1e2128;
+            --card-bg: #2a2e35;
+            --text-color: #ffffff;
+            --option-bg: #32373f;
+            --option-hover: #3d434d;
+            --correct-border: #4caf50;
+            --correct-bg: rgba(76, 175, 80, 0.1);
+            --wrong-border: #f44336;
+            --wrong-bg: rgba(244, 67, 54, 0.1);
+            --primary-blue: #5865f2;
+            --nav-bg: #18191c;
+        }
+
+        body {
+            font-family: "Microsoft JhengHei", sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .nav-bar {
+            width: 100%;
+            background-color: var(--nav-bg);
+            padding: 15px 0;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            flex-wrap: wrap; /* 手機螢幕小可以自動換行 */
+        }
+
+        .nav-btn {
+            background-color: var(--option-bg);
+            color: #ccc;
+            border: 2px solid transparent;
+            padding: 8px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+        }
+
+        .nav-btn.active {
+            background-color: var(--primary-blue);
+            color: white;
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .quiz-container {
+            width: 90%;
+            max-width: 650px;
+            background-color: var(--card-bg);
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            margin: 30px 0;
+        }
+
+        .quiz-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+
+        .quiz-title {
+            font-size: 1.1rem;
+            color: var(--primary-blue);
+            font-weight: bold;
+        }
+
+        .progress {
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .question {
+            font-size: 1.15rem;
+            line-height: 1.6;
+            margin-bottom: 25px;
+            min-height: 60px;
+            white-space: pre-wrap;
+        }
+
+        .options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .option {
+            background-color: var(--option-bg);
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            font-size: 1rem;
+        }
+
+        .option:hover:not(.disabled) {
+            background-color: var(--option-hover);
+        }
+
+        .option.correct {
+            border-color: var(--correct-border);
+            background-color: var(--correct-bg);
+        }
+
+        .option.wrong {
+            border-color: var(--wrong-border);
+            background-color: var(--wrong-bg);
+        }
+
+        .feedback-text {
+            margin-top: 8px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .controls {
+            margin-top: 30px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .action-btn {
+            background-color: var(--primary-blue);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+
+        .action-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    </style>
+</head>
+<body>
+
+<div class="nav-bar">
+    <button id="btn-web" class="nav-btn active" onclick="switchBank('web', this)">網大題庫</button>
+    <button id="btn-v1" class="nav-btn" onclick="switchBank('v1', this)">自然語言 V1</button>
+    <button id="btn-v2" class="nav-btn" onclick="switchBank('v2', this)">自然語言 V2</button>
+</div>
+
+<div class="quiz-container">
+    <div class="quiz-header">
+        <div class="quiz-title" id="bank-name">網大題庫測驗</div>
+        <div class="progress" id="progress">0 / 0</div>
+    </div>
+    
+    <div class="question" id="question-text">載入中...</div>
+    <div class="options-list" id="options-container"></div>
+    
+    <div class="controls">
+        <button class="action-btn" id="prev-btn" onclick="changeQuestion(-1)" disabled>上一題</button>
+        <button class="action-btn" id="next-btn" onclick="changeQuestion(1)" disabled>下一題</button>
+    </div>
+</div>
+
+<script>
+    // 直接內建所有題庫資料，完全不需要讀取外部檔案！
+    const allBanksData = {
+        web: [
+  { "id": 1, "question": "以下何者是抓取討論版資料時要注意的事項？", "options": { "A": "確定合適的討論版", "B": "訂定適當的關鍵字", "C": "設定白名單", "D": "設定黑名單", "E": "以上皆是" }, "answer": "E" },
+  { "id": 2, "question": "以下何者不是抓取和清理資料時要做的工作？", "options": { "A": "標詞性", "B": "去除格式化符號", "C": "去除特殊符號", "D": "全形轉半形" }, "answer": "A" },
+  { "id": 3, "question": "以下何者不是去除停用字後的應用？", "options": { "A": "文字雲", "B": "字詞共現圖", "C": "找出討論議題", "D": "句子翻譯", "E": "找出情緒" }, "answer": "D" },
+  { "id": 4, "question": "有關斷詞的敘述何者正確？", "options": { "A": "要先標好詞性才來斷詞", "B": "好的斷詞結果常需要輔助詞庫，比如領域字典", "C": "斷詞前應該先去除停用字(stopwords)", "D": "以上皆非" }, "answer": "B" },
+  { "id": 5, "question": "以下符號何者不是用來當句子的分隔符號？", "options": { "A": "、", "B": "。", "C": ";", "D": "?", "E": "!" }, "answer": "A" },
+  { "id": 6, "question": "有關詞性標記何者為非", "options": { "A": "每種語言都有詞性", "B": "JJ為形容詞", "C": "NN為名詞", "D": "VB為副詞" }, "answer": "D" },
+  { "id": 7, "question": "有關停用字的敘述何者正確？", "options": { "A": "不同語言有不同的停用字集", "B": "如果沒有排除停用字，文字雲裡會有不少停用字", "C": "為了較好的斷詞結果，常把停用字也加入斷詞字典", "D": "以上皆對" }, "answer": "D" },
+  { "id": 8, "question": "以下何者是還原字詞的原型？", "options": { "A": "Stemming", "B": "POS", "C": "Lemmatization", "D": "Word segmentation" }, "answer": "C" },
+  { "id": 9, "question": "以下有關文字的字詞共現圖何者正確？", "options": { "A": "高頻字一定會出現在字詞共現圖", "B": "兩個高頻且常一起出現的字一定會出現在字詞共現圖", "C": "字詞共現圖裡，一個群聚的字越多表示這個主題被討論越多", "D": "以上皆對" }, "answer": "B" },
+  { "id": 10, "question": "以下哪種圖是用顏色深淺來表示數量值？", "options": { "A": "長條圖", "B": "熱圖", "C": "曲線圖", "D": "字詞共現相關圖" }, "answer": "B" },
+  { "id": 11, "question": "下述有關 sentiment analysis 何者為非？", "options": { "A": "主要是找出文件裡如憤怒和高興的情緒", "B": "主要是找出文件評價的情緒取向", "C": "可以使用字典法來分析 sentence-level 的情緒", "D": "可以使用字典法來分析 document-level 的情緒" }, "answer": "A" },
+  { "id": 12, "question": "下列何種資料集裡無法決定情緒對象？", "options": { "A": "廣泛新聞資料", "B": "某一個特定議題討論版裡的評論", "C": "某一個產品討論版裡的評論", "D": "以上皆非" }, "answer": "A" },
+  { "id": 13, "question": "有關 LIWC 字庫的敘述何者正確？", "options": { "A": "LIWC 字庫僅區分正面和負面字", "B": "LIWC 字庫僅有英文字", "C": "LIWC 字庫裡每個字的類別有程度之分", "D": "LIWC 字庫可用來找出主觀的句子" }, "answer": "D" },
+  { "id": 14, "question": "有關 NRC 字庫的敘述何者正確？", "options": { "A": "NRC 字庫僅區分正面和負面字", "B": "NRC 字庫裡每個字可以有多個類別", "C": "NRC 字庫僅有英文字", "D": "以上皆非" }, "answer": "B" },
+  { "id": 15, "question": "以下那些詞性的字可能是情緒字？", "options": { "A": "形容詞", "B": "動詞", "C": "名詞", "D": "以上皆是" }, "answer": "D" },
+  { "id": 16, "question": "情緒分析字典法較不適合以下那種用途？", "options": { "A": "Sentence-level 情緒分析", "B": "Document-level 情緒分析", "C": "諷刺句分析", "D": "以上皆不適合" }, "answer": "C" },
+  { "id": 17, "question": "下述有關 coreNLP 的 NER 的敘述何者正確？", "options": { "A": "可用來找出人名 (Person)", "B": "可用來找出國家名 (Country)", "C": "可用來找出意識形態 (Ideology)", "D": "以上皆對" }, "answer": "D" },
+  { "id": 18, "question": "考慮以下句子：US officials will visit China next week for trade talks to resolve the remaining sticking points in talks to end the trade war with communist China. 下述有關 NER 的敘述何者有誤？", "options": { "A": "有三個 COUNTRY", "B": "有一個 DATE", "C": "有一個 IDEOLOGY", "D": "有一個 CAUSE_OF_DEATH" }, "answer": "C" },
+  { "id": 19, "question": "上述句子裡的字哪些經過 lemmatization 後會不同？", "options": { "A": "China", "B": "remaining", "C": "trade", "D": "communist" }, "answer": "B" },
+  { "id": 20, "question": "上述句子裡的詞性何者為非？", "options": { "A": "US / 名詞", "B": "officials / 名詞", "C": "sticking / 名詞", "D": "points / 動詞" }, "answer": "D" },
+  { "id": 21, "question": "用進階字典法決定句子情緒時需考慮？", "options": { "A": "Sentiment words", "B": "Amplifier", "C": "negation", "D": "以上皆是" }, "answer": "D" },
+  { "id": 22, "question": "使用文件分類方式（或稱機器學習）來進行情緒分析時，必定需要", "options": { "A": "斷詞", "B": "刪除停用字", "C": "正向文件集和負向文件集", "D": "情緒字典" }, "answer": "C" },
+  { "id": 23, "question": "以下哪些功能是 Stanford coreNLP 沒有提供的？", "options": { "A": "Machine Translation", "B": "NER", "C": "Sentence Sentiment", "D": "Universal Dependencies" }, "answer": "A" },
+  { "id": 24, "question": "按照 TF-IDF 定義，考慮以下狀況：一個資料集有 100000 篇文章，某一篇文章 A 有 256 個字，「分析」這個字出現在 100 篇文章裡，總出現次數為 512，「分析」這個字在文章 A 出現 8 次，請問「分析」這個字在文章 A 的 TF 值為？", "options": { "A": "1/8", "B": "1/32", "C": "1/64", "D": "1/16" }, "answer": "B" },
+  { "id": 25, "question": "承上題，請問「分析」這個字的 IDF 值為？", "options": { "A": "2", "B": "8", "C": "1", "D": "3" }, "answer": "D" },
+  { "id": 26, "question": "下列有關 TF-IDF 的敘述何者正確？", "options": { "A": "同一文件裡各個字的 TF 值都相同", "B": "同一文件裡各個字的 IDF 值都相同", "C": "同一文件裡各個字的 TF-IDF 值都相同", "D": "同一個字在不同文件的 IDF 值都相同" }, "answer": "D" },
+  { "id": 27, "question": "考慮以下兩個文件的 TF-IDF 向量：D1: (To be or not to be; not to be or to be) D2: (To be or not to be) 不考慮標點符號，並使用 TF-IDF 為文件向量，請問下列有關衡量值的敘述何者為真？", "options": { "A": "Euclidean distance 為 0", "B": "Cosine similarity 為 1", "C": "Pearson correlation 為 1", "D": "以上皆是" }, "answer": "D" },
+  { "id": 28, "question": "以下何者不是 N-gram model 的應用範圍？", "options": { "A": "打字時猜測下一個字母", "B": "編寫文章時建議下一個字或子句", "C": "語音轉文字時提高文字的正確率", "D": "生產良率預測" }, "answer": "D" },
+  { "id": 29, "question": "以下有關字詞共現圖（Word Correlation Network）何者為偽？", "options": { "A": "出現的字詞頻率必須高於某個門檻值", "B": "出現的線之兩個字詞其相關性必須高於某個門檻值", "C": "降低門檻值可以減少出現的字詞或是線", "D": "可以根據每個文件的 TF-IDF 向量來計算後繪出字詞共現圖" }, "answer": "C" },
+  { "id": 30, "question": "以下有關文件分類訓練資料集的敘述何者為非?", "options": { "A": "文件需要人工標籤(human label)", "B": "可用TF-IDF當成文件特徵向量(feature vector)", "C": "可用document-term matrix", "D": "一個文件可有多個類別" }, "answer": "D" },
+  { "id": 31, "question": "以下有關文件資料集的敘述何者正確?", "options": { "A": "通常文件特徵向量(feature vector)的維度很小", "B": "一個文件裡大部分的特徵值(feature value)為0", "C": "通常文件的類別會很多", "D": "測試的時間比訓練的時間長" }, "answer": "B" },
+  { "id": 32, "question": "以下哪一種特徵值不是從文件的內容取得?", "options": { "A": "文件的作者", "B": "文件字數", "C": "文件的可讀性", "D": "文件的平均句子長度" }, "answer": "A" },
+  { "id": 33, "question": "以下哪一種分類方法不需要訓練分類模型?", "options": { "A": "邏輯式回歸(logistic regression)", "B": "決策樹 (Decision tree)", "C": "SVM", "D": "KNN" }, "answer": "D" },
+  { "id": 34, "question": "以下哪一種分類方法的分類時間跟訓練資料集的大小成正比?", "options": { "A": "邏輯式回歸(logistic regression)", "B": "決策樹 (Decision tree)", "C": "SVM", "D": "KNN" }, "answer": "D" },
+  { "id": 35, "question": "請問以下哪一種資訊通常分類器(classifier)無法提供?", "options": { "A": "判斷出一份文件是屬於哪一個類別", "B": "判斷出一份文件是屬於哪一個類別的機率", "C": "判斷出每一個特徵屬性的重要性", "D": "那些特徵屬性是多餘的" }, "answer": "D" },
+  { "id": 36, "question": "請問以下哪一種用來衡量分類器的效能?", "options": { "A": "specificity", "B": "precision", "C": "recall", "D": "sensitivity", "E": "以上皆是" }, "answer": "E" },
+  { "id": 37, "question": "考慮一個Covid-19的測試劑，我們希望不要漏掉任何一個感染的人，請問以下敘述何者正確?", "options": { "A": "Precision要100%", "B": "Recall要100%", "C": "Accuracy要100%", "D": "F1 score要100%" }, "answer": "B" },
+  { "id": 38, "question": "考慮以下的數種分類器的ROC圖，以下敘述何者為非?", "options": { "A": "對於每一種方法，sensitivity越大則specificity也越大", "B": "對於任何方法，若recall = 1，則specificity都為0", "C": "每一種方法都比隨機猜測(random guess)好", "D": "最好的方法為proposed CNN" }, "answer": "A" },
+  { "id": 39, "question": "使用傳統的方法（即時講義所提的方法）來做文件分類，以下敘述何者正確?", "options": { "A": "通常需要大量的訓練資料", "B": "每一個類別的文件不能太少", "C": "各個類別的資料量不要差太多", "D": "以上皆是" }, "answer": "D" }
+],
+        v1: [
+  { "id": 1, "question": "在進行斷句（Sentence Segmentation）時，為什麼在英文處理中不能單純將句號（.）視為分隔符號？", "options": { "A": "因為英文的句號與小數點在計算機編碼中是完全不同的字元。", "B": "因為句號在英文縮寫（如 Ph.D. 或 Mr.）中不具備終止句子的功能。", "C": "因為英文句子結尾通常使用驚嘆號或問號，很少使用句號。", "D": "因為在資訊檢索中，標點符號通常會在一開始就被全部移除。" }, "answer": "B" },
+  { "id": 2, "question": "關於中文斷詞工具 Jieba（結巴）與 CKIP 的比較，下列敘述何者正確？", "options": { "A": "CKIP 是基於規則的系統，而 Jieba 是目前唯一的深度學習斷詞工具。", "B": "Jieba 僅能處理簡體中文，完全無法應用於繁體中文文本。", "C": "CKIP 在處理繁體中文時的準確度通常高於 Jieba，但執行速度較慢。", "D": "在 Method Chaining 的風格中，Jieba 比 CKIP 更適合與 Pandas 結合。" }, "answer": "C" },
+  { "id": 3, "question": "根據 Tidy Data 的定義，下列哪一項最符合其核心原則？", "options": { "A": "所有的觀察值應該合併在同一個儲存格中以節省空間。", "B": "維度變數（Dimension Variables）與衡量變數（Measure Variables）應混合排列。", "C": "欄位名稱（Headers）應該包含具體的數值資料（如：2021, 2022）。", "D": "每一個變數（Variable）應該形成一個欄位（Column）。" }, "answer": "D" },
+  { "id": 4, "question": "在 Python Pandas 中，若要將寬格式（Wide Format）的資料轉換為符合 Tidy Data 的長格式，應使用哪一個函式？", "options": { "A": "dropna()", "B": "pivot()", "C": "groupby()", "D": "melt()" }, "answer": "D" },
+  { "id": 5, "question": "使用 Method Chaining（方法鏈）撰寫 Pandas 程式碼的主要優點為何？", "options": { "A": "能使程式碼更簡潔易讀，且上一個函式的輸出直接作為下一個函式的輸入。", "B": "此方式可以讓原本非結構化的文字資料自動轉為結構化表格。", "C": "能自動修正斷詞工具在處理繁體中文時產生的誤判問題。", "D": "能顯著提升 Python 虛擬機的記憶體回收（GC）速度。" }, "answer": "A" },
+  { "id": 6, "question": "在詞性標記（Part of Speech, POS）中，根據 Penn Treebank 標籤集，標籤「NNP」代表什麼意義？（第一題）", "options": { "A": "動詞的過去式", "B": "普通名詞（複數）", "C": "連接詞", "D": "專有名詞（單數）" }, "answer": "D" },
+  { "id": 7, "question": "在詞性標記（Part of Speech, POS）中，根據 Penn Treebank 標籤集，標籤「NNP」代表什麼意義？（第二題）", "options": { "A": "動詞的過去式", "B": "普通名詞（複數）", "C": "連接詞", "D": "專有名詞（單數）" }, "answer": "D" },
+  { "id": 8, "question": "在進階字典法（Lexicon Based Sentiment Analysis）中，除了正負面情緒字典外，加入「否定字集」和「加強字集」的主要作用為何？（第一題）", "options": { "A": "取代機器學習模型", "B": "自動過濾停用詞", "C": "可以正確計算情緒修正值", "D": "識別地名或組織名" }, "answer": "C" },
+  { "id": 9, "question": "在進階字典法（Lexicon Based Sentiment Analysis）中，除了正負面情緒字典外，加入「否定字集」和「加強字集」的主要作用為何？（第二題）", "options": { "A": "取代機器學習模型", "B": "自動過濾停用詞", "C": "可以正確計算情緒修正值", "D": "識別地名或組織名" }, "answer": "C" },
+  { "id": 10, "question": "在進階字典法（Lexicon Based Sentiment Analysis）中，除了正負面情緒字典外，加入「否定字集」和「加強字集」的主要作用為何？（第三題）", "options": { "A": "取代機器學習模型", "B": "自動過濾停用詞", "C": "可以正確計算情緒修正值", "D": "識別地名或組織名" }, "answer": "C" },
+  { "id": 11, "question": "在文字處理流程中，為何通常需要移除「停用詞（Stop words）」？", "options": { "A": "因為停用詞詞性不確定", "B": "會導致套件崩潰", "C": "頻率高但區別度低，會干擾分析結果。", "D": "Tidy Data 格式要求" }, "answer": "C" },
+  { "id": 12, "question": "假訊息（Fake News）中，Misinformation 與 Disinformation 的主要區別在於：", "options": { "A": "傳播媒介", "B": "是否由 AI 生成", "C": "內容錯誤程度", "D": "傳播者是否有惡意或特定的誤導意圖。" }, "answer": "D" },
+  { "id": 13, "question": "若在處理中文文本時，遇到詞彙「般若」被錯誤切分為「般」與「若」，利用 N-gram 可以如何協助解決此問題？", "options": { "A": "轉為英文處理", "B": "標註為 NNP", "C": "找出高頻連續出現的 Bigram 候選詞加入字典", "D": "替換為智慧" }, "answer": "C" },
+  { "id": 14, "question": "在使用 Pandas 對非結構化資料進行清理時，apply() 函式通常扮演什麼角色？", "options": { "A": "對 DataFrame 中特定欄位的每一個元素逐一執行指定的函式。", "B": "衡量變數命名", "C": "生成文字雲", "D": "資料表合併" }, "answer": "A" },
+  { "id": 15, "question": "關於 CKIP 實體型態識別出的標籤「GPE」，其代表的意義通常為何？", "options": { "A": "特定的數值", "B": "地理政治實體，如城市、國家或行政區。", "C": "特定的組織機構", "D": "具體的時間與日期" }, "answer": "B" },
+  { "id": 16, "question": "在機器學習序列標註模型（Sequence Labeling Model）中，下列何者「不屬於」常用的特徵（Features）？", "options": { "A": "前後詞 Context Words", "B": "前一個已預測的標籤", "C": "整個文件集的總情緒值", "D": "單詞本身的詞性標記" }, "answer": "C" },
+  { "id": 17, "question": "關於 Google Books Ngram Viewer，它如何反映學術術語的歷史變化？", "options": { "A": "Ngram 無法處理三詞以上", "B": "使用頻率重合", "C": "Text Analytics 最受歡迎", "D": "顯示 2016 年後 NLP 頻率顯著超越 Text Mining。" }, "answer": "D" },
+  { "id": 18, "question": "SnowNLP 對於情緒價值的計算輸出範圍與意義為何？", "options": { "A": "介於 [0,1] 之間，愈接近 1 代表愈正向。", "B": "數值代表稀有度", "C": "0 代表中性", "D": "僅輸出 0 或 1" }, "answer": "A" },
+  { "id": 19, "question": "在處理 Messy Data 時，若發現一個欄位標題同時包含了年分與類別（第一題），違反哪項原則？", "options": { "A": "維度變數必須是數值", "B": "列必須排序", "C": "一個欄位應只代表一個變數。", "D": "不應存在 NA 值" }, "answer": "C" },
+  { "id": 20, "question": "在處理 Messy Data 時，若發現一個欄位標題同時包含了年分與類別（第二題），違反哪項原則？", "options": { "A": "維度變數必須是數值", "B": "列必須排序", "C": "一個欄位應只代表一個變數。", "D": "不應存在 NA 值" }, "answer": "C" },
+  { "id": 21, "question": "在文字清理步驟中，若發現文本中包含重複的換行符號（\\n\\n），有何影響？", "options": { "A": "導致斷句出錯或處理效能下降。", "B": "導致維度變數遺失", "C": "提高 CKIP 效率", "D": "情緒轉向" }, "answer": "A" },
+  { "id": 22, "question": "根據教材提到的 AI 倫理案例，自動過濾履歷系統最容易產生的公平性問題為何？", "options": { "A": "無法辨識 PDF", "B": "速度過快", "C": "模型可能會延續歷史資料中的偏見。", "D": "錄取關鍵字者" }, "answer": "C" },
+  { "id": 23, "question": "在執行 CKIP 斷詞時，為何建議設定自訂字典（Lexicon）？", "options": { "A": "否則無法輸出 Tidy Data", "B": "CKIP 預設僅有英文", "C": "為了處理未被包含在預設字典中的特定領域詞彙。", "D": "動詞轉名詞" }, "answer": "C" },
+  { "id": 24, "question": "情緒分析的文件分類法（Text Classification）中，輸出的結果通常是什麼？", "options": { "A": "該文件屬於正面或負面的分類標籤及其機率值。", "B": "POS 與 NER 標籤", "C": "相似文件 ID", "D": "文字雲圖形" }, "answer": "A" },
+  { "id": 25, "question": "在使用 N-gram 進行計算時，所謂的「Moving Window」概念是指：", "options": { "A": "每次移動一個詞的位置，並抓取連續的 n 個項目。", "B": "偵測重複列", "C": "進度條", "D": "動態調整字典" }, "answer": "A" },
+  { "id": 26, "question": "對於「維度變數（Dimension Variables）」的描述，下列何者正確？（第一題）", "options": { "A": "它是指關於一個實體的基本屬性（如姓名、性別、年份）。", "B": "必須是加總平均資料", "C": "放在最末端欄位", "D": "預測唯一特徵" }, "answer": "A" },
+  { "id": 27, "question": "對於「維度變數（Dimension Variables）」的描述，下列何者正確？（第二題）", "options": { "A": "它是指關於一個實體的基本屬性（如姓名、性別、年份）。", "B": "必須是加總平均資料", "C": "放在最末端欄位", "D": "預測唯一特徵" }, "answer": "A" },
+  { "id": 28, "question": "下列哪一種情形屬於典型的 Messy Data（雜亂資料）？", "options": { "A": "不同指標放在同列不同格", "B": "表格的標題名稱是觀察值的數值，而非變數名稱。", "C": "每一列只代表一次觀察", "D": "維度衡量變數分開存" }, "answer": "B" },
+  { "id": 29, "question": "在基本文字資料處理中，抓取資料與清理資料的主要目的是什麼？", "options": { "A": "建立機器學習模型", "B": "自動產生摘要", "C": "情緒分類", "D": "找出適當的文本以供分析" }, "answer": "D" },
+  { "id": 30, "question": "根據課程內容，在分析 PTT 服貿爭議時，為什麼需要設定「黑名單」關鍵字？", "options": { "A": "為了過濾掉雖然包含關鍵字但主題不符的文章", "B": "增加運算速度", "C": "找出政治板塊", "D": "識別真實身份" }, "answer": "A" },
+  { "id": 31, "question": "若要識別假評論，以下哪一個「構面」通常不是分析的重點？", "options": { "A": "內容是否包含強烈推廣意圖", "B": "星等與平均值顯著差異", "C": "發文時間集中在早期", "D": "評論者的性別與族裔" }, "answer": "D" },
+  { "id": 32, "question": "在中文文本清理過程中，將「全形字轉為半形字」的主要優點是什麼？", "options": { "A": "校正拼字", "B": "節省儲存空間並統一格式", "C": "增加美感", "D": "提升情感準確率" }, "answer": "B" },
+  { "id": 33, "question": "關於實體型態識別 (NER)，其在情緒分析中的主要作用是什麼？", "options": { "A": "找出情緒所針對的對象（如人名、組織）", "B": "計算總字數", "C": "過濾形容詞", "D": "英文翻譯中文" }, "answer": "A" },
+  { "id": 34, "question": "在序列標註中，IOB 編碼中的「B」代表什麼含義？", "options": { "A": "背景字元", "B": "實體的開頭字元", "C": "中間字元", "D": "二進制編碼" }, "answer": "B" },
+  { "id": 35, "question": "中文情緒套件 SnowNLP 偵測出的情緒值意義為何？", "options": { "A": "星等", "B": "0 代表中性", "C": "取決於詞典", "D": "範圍為 [0,1]，越接近 1 越正向" }, "answer": "D" },
+  { "id": 36, "question": "在「個案探討」中，巴黎 (PARIS) 系統拒絕 Hara 的真正技術原因為何？", "options": { "A": "訓練資料中優秀員工通常具備運動紀錄", "B": "排除殘障人士", "C": "格式不符", "D": "專業能力不足" }, "answer": "A" },
+  { "id": 37, "question": "關於假訊息 (Disinformation) 的傳播，下列敘述何者正確？", "options": { "A": "轉傳者會讀完全文", "B": "AI 平衡資訊", "C": "人們常因訊息符合自身立場而未經查證就轉傳", "D": "只有文字訊息" }, "answer": "C" },
+  { "id": 38, "question": "「遞迴深度模型法」相比於傳統字典法，其最大的優勢是什麼？", "options": { "A": "不需語法結構", "B": "頻率判斷", "C": "不需訓練資料", "D": "能處理句子中複雜的結構與字詞組合情緒" }, "answer": "D" }
+],
+        v2: [
+  { "id": 1, "question": "在基本自然語言處理（NLP）的流程中，哪一個步驟通常佔據了分析人員約 70% 的時間？", "options": { "A": "詞性標記（Part of Speech）", "B": "資料抓取（Retrieving Data）", "C": "斷句與斷詞（Segmentation）", "D": "資料初步清理（Cleaning the Text）" }, "answer": "D" },
+  { "id": 2, "question": "處理 PTT 等社群媒體資料時，由於使用者習慣，通常會建議將什麼符號視為「句號」來進行斷句？", "options": { "A": "特定表情符號（如 XD）", "B": "兩個換行符號", "C": "半形逗號", "D": "驚嘆號" }, "answer": "B" },
+  { "id": 3, "question": "在使用「結巴」（Jieba）進行中文斷詞後，為了提升分析品質，通常會進行哪一項後續處理以去除無意義的常見字？", "options": { "A": "去除停用詞（Stop words）", "B": "字詞還原（Lemmatization）", "C": "詞性加權", "D": "全形轉半形" }, "answer": "A" },
+  { "id": 4, "question": "在 Named Entity Recognition (NER) 的標記方法中，「IOB encoding」裡的「B」代表什麼含義？", "options": { "A": "二進制分類（Binary）", "B": "實體的中間字詞（Between）", "C": "實體的起始字詞（Beginning）", "D": "非實體字詞（Background）" }, "answer": "C" },
+  { "id": 5, "question": "根據教材內容，SnowNLP 是一套常用於中文的情緒分析套件，其輸出的情緒值範圍與代表意義為何？", "options": { "A": "範圍為 [0,100]，越高代表情緒強度越大", "B": "範圍不固定，取決於正面字與負面字的數量差", "C": "範圍為 [−1,1]，−1 為負面，1 為正面", "D": "範圍為 [0,1]，0 為負面，1 為正面" }, "answer": "D" },
+  { "id": 6, "question": "關於 AI 時代的假訊息問題，Misinformation 與 Disinformation 的主要區別在於什麼？", "options": { "A": "訊息的真實性百分比", "B": "傳播的速度快慢", "C": "訊息是文字還是影片格式", "D": "發布者是否有「惡意圖」（Intent）" }, "answer": "D" },
+  { "id": 7, "question": "在繪製文字雲（WordCloud）時，圖中字體的大小通常是由下列哪一項指標決定的？", "options": { "A": "該字詞的情緒極性", "B": "該字詞的字元長度", "C": "該字詞的詞性重要度", "D": "該字詞出現的頻率（Frequency）" }, "answer": "D" },
+  { "id": 8, "question": "在使用 Python 進行網頁爬蟲時，哪一個工具常被提及作為 HTML Parser 來解析網頁內容？", "options": { "A": "Pandas", "B": "Matplotlib", "C": "Beautiful Soup", "D": "Jieba" }, "answer": "C" },
+  { "id": 9, "question": "在進行進階情緒處理時，若要處理「not very good」這類包含否定字與加強字的語句，最適合的方法是？", "options": { "A": "停用詞移除法", "B": "簡單頻率計數", "C": "進階字典法（如 TextBlob）", "D": "關鍵字白名單篩選" }, "answer": "C" },
+  { "id": 10, "question": "在馬來西亞市場的客戶評論熱點關聯分析中，若設定 Word Correlation > 0.25，這代表什麼分析邏輯？", "options": { "A": "評論者對該品牌的忠誠度分數", "B": "自動翻譯的準確率閥值", "C": "兩個詞在同一則評論中共同出現的關聯強度", "D": "單個詞在文本中出現的百分比" }, "answer": "C" },
+  { "id": 11, "question": "為了過濾「假評論」（Fake reviews），教材中建議可以依據哪些維度進行初步判斷？", "options": { "A": "依瀏覽器版本", "B": "依評論被點擊的次數", "C": "依字型大小與顏色", "D": "依作者、內容、評價、PO文時間" }, "answer": "D" },
+  { "id": 12, "question": "在字詞共現圖（Co-occurrence Network）中，如果兩個節點（字詞）之間的連線越粗，代表什麼？", "options": { "A": "該詞出現的總次數越多", "B": "相關係數（Correlation）越高", "C": "這是一組反義詞", "D": "該詞是動詞而非名詞" }, "answer": "B" },
+  { "id": 13, "question": "下列哪一種情緒分析方法需要使用到「情緒文句結構樹」（Sentiment Treebank）？", "options": { "A": "熱量圖分析法", "B": "簡單字典累計法", "C": "機器學習分類法", "D": "遞迴深度模型法（Recursive Deep Model）" }, "answer": "D" },
+  { "id": 14, "question": "在資料初步清理中，將「全形轉半形」的主要目的是？", "options": { "A": "格式統一以利後續程式比對", "B": "符合法規要求", "C": "增加文本的情緒強度", "D": "節省儲存空間" }, "answer": "A" },
+  { "id": 15, "question": "若我們想要了解某品牌在不同月份的特定議題變化趨勢，最適合使用下列哪一種圖表？", "options": { "A": "IO 標記表", "B": "單一文字雲", "C": "各月份議題趨勢圖（Bar chart by month）", "D": "HTML 結構樹" }, "answer": "C" },
+  { "id": 16, "question": "在文本分析中，將「鄉民百科」作為同義字字典，是屬於 NLP 流程中的哪一部分？", "options": { "A": "HTML 解析", "B": "情緒樹構建", "C": "資料抓取", "D": "保留特色的字詞（Preserving significant words）" }, "answer": "D" },
+  { "id": 17, "question": "根據教材，若使用熱量圖（Heatmap）分析公車路線與案件議題，顏色「深淺」通常代表什麼？", "options": { "A": "路線的長短", "B": "公車到站的準確率", "C": "司機服務的態度", "D": "案件數量的多寡" }, "answer": "D" },
+  { "id": 18, "question": "在機器學習序列模型（ML sequence model）進行 NER 訓練時，第二步「Label each token」的作用是？", "options": { "A": "移除多餘的標點符號", "B": "為每個字詞標註對應的實體類別", "C": "計算每個字出現的機率", "D": "繪製詞頻分布圖" }, "answer": "B" },
+  { "id": 19, "question": "教材中提到 AI 自動過濾履歷（Resume filtering）可能產生的倫理問題，主要源自於下列何者？", "options": { "A": "AI 處理速度太慢", "B": "求職者個資被完全公開", "C": "檔案格式不支援 PDF", "D": "訓練資料中潛藏的偏見（Bias）" }, "answer": "D" },
+  { "id": 20, "question": "在情緒分析中，一個「Bayesian-Based ML model」主要依靠什麼來判斷文本的情緒？", "options": { "A": "手動編寫的邏輯判斷式", "B": "模擬人類大腦的深層神經網路", "C": "字詞在字典中的正負點數總計", "D": "字詞出現的機率與先驗知識" }, "answer": "D" },
+  { "id": 21, "question": "在資料抓取的關鍵字設定中，「黑名單」（Black list）的作用是？", "options": { "A": "紀錄系統執行時產生的錯誤訊息", "B": "列出一定要包含在內的字詞", "C": "排除雖然包含關鍵字但無關的文章", "D": "標記為惡意攻擊者的帳號名單" }, "answer": "C" },
+  { "id": 22, "question": "教材提到，針對 PTT 評論分析時常會遇到「中英夾雜」或「符號取代」的情形（如：我 QQ），這屬於哪一個處理階段的挑戰？", "options": { "A": "字詞呈現方式（Displaying Words）", "B": "熱量圖生成", "C": "資料抓取（Retrieving Data）", "D": "資料初步清理（Cleaning the Text）" }, "answer": "D" },
+  { "id": 23, "question": "對於英文文本的 NLP，為什麼需要執行「Stemming」或「Lemmatization」？", "options": { "A": "將動詞的不同時態還原成基本型態", "B": "檢查拼字是否正確", "C": "增加文本的藝術美感", "D": "自動翻譯成其他語言" }, "answer": "A" },
+  { "id": 24, "question": "在「假訊息」單元中，提到用來自動驗證訊息真實性的組織或網站有哪些？", "options": { "A": "Facebook, Instagram", "B": "OpenAI, Google Search", "C": "Yelp, ShopperApproved", "D": "PolitiFact, FactCheck.org" }, "answer": "D" },
+  { "id": 25, "question": "「詞性標記」（POS）對後續分析（如畫文字雲）最重要的貢獻之一是？", "options": { "A": "協助篩選出具代表性的名詞與動詞", "B": "減少資料庫的儲存負擔", "C": "確定文本的發布地理位置", "D": "提高網頁抓取的成功率" }, "answer": "A" },
+  { "id": 26, "question": "在「進階字典法」的情緒極性（Polarity）計算中，程度副詞（如 very）如何影響分數？", "options": { "A": "將情緒分數由正轉負", "B": "對原本的情緒分數進行加乘放大", "C": "將情緒分數固定為 0.5", "D": "完全移除該句子的主觀性" }, "answer": "B" },
+  { "id": 27, "question": "所謂的「誤導性訊息」（Misleading Information），其內容特點為何？", "options": { "A": "完全由機器生成的亂碼", "B": "只會以高解析度影片呈現", "C": "發布者一定是受過專業訓練的網軍", "D": "訊息本身不一定是假的，但引導產生錯誤結論" }, "answer": "D" },
+  { "id": 28, "question": "在機器學習 NER 模型中，BERT 被提及作為一種先進的架構，它屬於下列哪一類別？", "options": { "A": "離線的中文同義字典", "B": "基於規則的正則表達式（Regex）", "C": "深度學習預訓練模型（Deep Learning）", "D": "簡單的 HTML 解析器" }, "answer": "C" },
+  { "id": 29, "question": "若一個網頁抓取任務中，需要自動過濾掉長度短於 5 個字的評論，這主要是為了解決什麼問題？", "options": { "A": "防止程式因為字數太少而當機", "B": "縮短爬蟲執行的物理時間", "C": "避免觸犯著作權法", "D": "過濾掉缺乏分析價值的短評" }, "answer": "D" },
+  { "id": 30, "question": "關於詞性標記集，教材提到的「Penn Treebank」與「CKIP」分別主要應用於哪種語言？", "options": { "A": "Penn Treebank 用於英文；CKIP 用於中文", "B": "CKIP 用於 HTML 解析；Penn 用於 JSON 解析", "C": "兩者皆僅適用於中文程式碼解析", "D": "Penn Treebank 用於中文；CKIP 用於日文" }, "answer": "A" }
+]
+    };
+
+    let currentBankKey = 'web';
+    let currentIdx = 0;
+    let userAnswers = {}; 
+
+    function switchBank(key, btnElement) {
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+        btnElement.classList.add('active');
+
+        currentBankKey = key;
+        currentIdx = 0;
+        document.getElementById('bank-name').innerText = btnElement.innerText;
+        
+        loadQuestion();
+    }
+
+    function loadQuestion() {
+        const bank = allBanksData[currentBankKey];
+        if (!bank || bank.length === 0) return;
+
+        const q = bank[currentIdx];
+        document.getElementById('progress').innerText = `${currentIdx + 1} / ${bank.length}`;
+        document.getElementById('question-text').innerText = q.question;
+        
+        const container = document.getElementById('options-container');
+        container.innerHTML = '';
+
+        const bankAnswers = userAnswers[currentBankKey] || {};
+        const savedAnswer = bankAnswers[currentIdx];
+
+        Object.entries(q.options).forEach(([key, value]) => {
+            const optionDiv = document.createElement('div');
+            optionDiv.className = 'option';
+            
+            if (savedAnswer) {
+                optionDiv.style.pointerEvents = 'none';
+                if (key === q.answer) {
+                    optionDiv.classList.add('correct');
+                    optionDiv.innerHTML = `<strong>${key}.</strong> ${value} <div class="feedback-text">✓ 正確答案</div>`;
+                } else if (key === savedAnswer) {
+                    optionDiv.classList.add('wrong');
+                    optionDiv.innerHTML = `<strong>${key}.</strong> ${value} <div class="feedback-text">✕ 你的選擇</div>`;
+                } else {
+                    optionDiv.innerHTML = `<strong>${key}.</strong> ${value}`;
+                }
+            } else {
+                optionDiv.innerHTML = `<strong>${key}.</strong> ${value}`;
+                optionDiv.onclick = () => handleSelect(key);
+            }
+            container.appendChild(optionDiv);
+        });
+
+        document.getElementById('prev-btn').disabled = currentIdx === 0;
+        document.getElementById('next-btn').disabled = false;
+        document.getElementById('next-btn').innerText = (currentIdx === bank.length - 1) ? "完成測驗" : "下一題";
+    }
+
+    function handleSelect(selectedKey) {
+        if (!userAnswers[currentBankKey]) userAnswers[currentBankKey] = {};
+        userAnswers[currentBankKey][currentIdx] = selectedKey;
+        loadQuestion();
+    }
+
+    function changeQuestion(step) {
+        const bank = allBanksData[currentBankKey];
+        if (!bank) return;
+
+        if (currentIdx === bank.length - 1 && step === 1) {
+            alert("您已完成本題庫測驗！");
+            return;
+        }
+        currentIdx += step;
+        if (currentIdx < 0) currentIdx = 0;
+        loadQuestion();
+    }
+
+    // 初始化載入
+    loadQuestion();
+</script>
+</body>
+</html>
